@@ -1,0 +1,4 @@
+groq
+ringcentral
+requests
+python-dotenv
