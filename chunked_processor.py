@@ -68,8 +68,8 @@ class ChunkedProcessor(DevTierOptimizedProcessor):
             
             logger.info(f"🔄 Processing chunk {chunk_num}/{total_chunks} ({len(chunk)} recordings)")
             
-            # Process this chunk
-            self.process_recordings_concurrent(chunk, output_dir, target_date)
+            # Process this chunk with simple sequential processing
+            self._process_chunk_simple(chunk, output_dir, target_date)
             
             # Check if we're running out of time
             elapsed = (datetime.now() - self.stats['start_time']).total_seconds()
@@ -81,6 +81,34 @@ class ChunkedProcessor(DevTierOptimizedProcessor):
         elapsed = (datetime.now() - self.stats['start_time']).total_seconds()
         logger.info(f"✅ Chunk processing completed in {elapsed/3600:.2f} hours")
         logger.info(f"📊 Processed: {self.stats['recordings_processed']} recordings")
+
+    def _process_chunk_simple(self, chunk, output_dir, target_date):
+        """Process a chunk of recordings with simple sequential processing"""
+        results = []
+        
+        for i, call_log in enumerate(chunk, 1):
+            logger.info(f"📊 Processing recording {i}/{len(chunk)}")
+            
+            # Download recording
+            download_result = self.download_recording(call_log, output_dir)
+            if not download_result:
+                logger.warning(f"❌ Failed to download recording {call_log.get('id', 'N/A')}")
+                continue
+            
+            audio_path, call_metadata = download_result
+            
+            # Transcribe recording
+            transcription_result = self.transcribe_recording(audio_path, call_metadata)
+            if transcription_result:
+                results.append(transcription_result)
+                logger.info(f"✅ Completed recording {i}/{len(chunk)}")
+            else:
+                logger.warning(f"❌ Failed to transcribe recording {call_log.get('id', 'N/A')}")
+        
+        # Save results for this chunk
+        if results:
+            self.save_results(results, output_dir, target_date)
+            logger.info(f"💾 Saved {len(results)} transcriptions")
 
 def main():
     # Get target date from environment or default to yesterday
