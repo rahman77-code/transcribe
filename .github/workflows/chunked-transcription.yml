@@ -5,6 +5,11 @@ on:
     # Run every day at 2 AM UTC
     - cron: '0 2 * * *'
   workflow_dispatch:  # Allow manual trigger
+    inputs:
+      target_date:
+        description: 'Date to process (YYYY-MM-DD format). Leave empty for yesterday.'
+        required: false
+        type: string
 
 jobs:
   # First processing batch
@@ -36,6 +41,7 @@ jobs:
         GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
         GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
         GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+        TARGET_DATE: ${{ inputs.target_date }}
         CHUNK_SIZE: 20
         RC_RPS: 0.3
       run: |
@@ -87,6 +93,7 @@ jobs:
         GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
         GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
         GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+        TARGET_DATE: ${{ inputs.target_date }}
         CHUNK_SIZE: 20
         RC_RPS: 0.3
       run: |
