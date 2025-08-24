@@ -74,8 +74,18 @@ jobs:
           fi
         fi
 
+    # ========== NEW: Set DATE_STR for file/release ==========
+    - name: Set DATE_STR
+      run: |
+        if [ -n "${{ inputs.target_date }}" ]; then
+          DATE_STR="${{ inputs.target_date }}"
+        else
+          DATE_STR="$(date -u +%F)"   # e.g. 2025-08-25
+        fi
+        echo "DATE_STR=$DATE_STR" >> $GITHUB_ENV
+
     # ========== NEW: Build Excel from all CSV/JSON in daily_recordings ==========
-    - name: Build Excel (CSV + JSON → data.xlsx)
+    - name: Build Excel (CSV + JSON → data-${{ env.DATE_STR }}.xlsx)
       if: always()
       run: |
         python - << 'PY'
@@ -83,7 +93,7 @@ jobs:
         import pandas as pd
 
         base = "daily_recordings"
-        out = "data.xlsx"
+        out = f"data-${{ os.environ['DATE_STR'] }}.xlsx"
 
         if not os.path.isdir(base):
             print("No daily_recordings/ directory found; creating empty Excel.")
@@ -141,14 +151,6 @@ jobs:
       if: always()
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: excel-${{ github.run_number }}
-        name: "Daily Excel (run ${{ github.run_number }})"
-        files: data.xlsx
-
-    # If you don't want a Release, and just want the Excel as an artifact, use this instead:
-    # - name: Upload Excel as artifact (alternative)
-    #   if: always()
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     name: excel-${{ github.run_number }}
-    #     path: data.xlsx
+        tag_name: excel-${{ env.DATE_STR }}
+        name: "Daily Excel — ${{ env.DATE_STR }}"
+        files: data-${{ env.DATE_STR }}.xlsx
