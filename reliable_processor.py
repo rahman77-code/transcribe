@@ -240,14 +240,38 @@ class ReliableProcessor:
         # Sort by date
         results.sort(key=lambda x: x.get('date', ''))
         
-        # Save JSON
-        json_file = output_dir / f"transcriptions_{target_date}.json"
-        with open(json_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
+        # Calculate skipped recordings
+        recordings_skipped = self.stats['recordings_found'] - self.stats['processed'] - self.stats['errors']
         
-        # Save CSV
+        # Save JSON with statistics
+        json_file = output_dir / f"transcriptions_{target_date}.json"
+        json_data = {
+            "statistics": {
+                "processing_date": target_date,
+                "total_recordings_found": self.stats['recordings_found'],
+                "total_recordings_processed": self.stats['processed'],
+                "total_recordings_skipped": recordings_skipped,
+                "success_rate": f"{(self.stats['processed'] / max(self.stats['recordings_found'], 1) * 100):.1f}%",
+                "total_audio_minutes": sum(r.get('duration', 0) for r in results) / 60,
+                "download_errors": self.stats['errors'],
+                "transcription_errors": 0
+            },
+            "transcriptions": results
+        }
+        with open(json_file, 'w', encoding='utf-8') as f:
+            json.dump(json_data, f, indent=2, ensure_ascii=False)
+        
+        # Save CSV with statistics in header
         csv_file = output_dir / f"transcriptions_{target_date}.csv"
         with open(csv_file, 'w', encoding='utf-8') as f:
+            # Add statistics as comments
+            f.write(f"# Processing Statistics for {target_date}\n")
+            f.write(f"# Total Recordings Found: {self.stats['recordings_found']}\n")
+            f.write(f"# Total Recordings Processed: {self.stats['processed']}\n")
+            f.write(f"# Total Recordings Skipped: {recordings_skipped}\n")
+            f.write(f"# Success Rate: {json_data['statistics']['success_rate']}\n")
+            f.write(f"#\n")
+            
             f.write("Recording ID,Date,Duration (seconds),From,To,Direction,Transcription\n")
             for result in results:
                 transcription = result["transcription"].replace('"', '""')
