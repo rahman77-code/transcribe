@@ -85,7 +85,7 @@ jobs:
         echo "DATE_STR=$DATE_STR" >> $GITHUB_ENV
 
     # ========== NEW: Build Excel from all CSV/JSON in daily_recordings ==========
-    - name: Build Excel (CSV + JSON → data-${{ env.DATE_STR }}.xlsx)
+    - name: Build Excel (CSV + JSON -> data-${{ env.DATE_STR }}.xlsx)
       if: always()
       run: |
         python - << 'PY'
@@ -93,55 +93,55 @@ jobs:
         import pandas as pd
 
         base = "daily_recordings"
-        out = f"data-${{ os.environ['DATE_STR'] }}.xlsx"
+        out = f"data-{os.environ['DATE_STR']}.xlsx"
 
         if not os.path.isdir(base):
-            print("No daily_recordings/ directory found; creating empty Excel.")
-            with pd.ExcelWriter(out, engine="openpyxl") as w:
-                pd.DataFrame([]).to_excel(w, index=False, sheet_name="EMPTY")
-            raise SystemExit(0)
+          print("No daily_recordings/ directory found; creating empty Excel.")
+          with pd.ExcelWriter(out, engine="openpyxl") as w:
+            pd.DataFrame([]).to_excel(w, index=False, sheet_name="EMPTY")
+          raise SystemExit(0)
 
         def clean_sheet(name: str) -> str:
-            # Excel restrictions: <=31 chars, no []:*?/\
-            name = re.sub(r'[\[\]\:\*\?\/\\]', '_', name)[:31] or "Sheet"
-            return name
+          # Excel restrictions: <=31 chars, no []:*?/\
+          name = re.sub(r'[\[\]\:\*\?\/\\]', '_', name)[:31] or "Sheet"
+          return name
 
         csvs  = sorted(glob.glob(os.path.join(base, "**", "*.csv"),  recursive=True))
         jsons = sorted(glob.glob(os.path.join(base, "**", "*.json"), recursive=True))
 
         used = set()
         def uniq(n: str) -> str:
-            base = n[:28]
-            i, s = 1, n
-            while s in used:
-                s = f"{base}_{i}"
-                i += 1
-            used.add(s)
-            return s
+          base = n[:28]
+          i, s = 1, n
+          while s in used:
+            s = f"{base}_{i}"
+            i += 1
+          used.add(s)
+          return s
 
         with pd.ExcelWriter(out, engine="openpyxl") as w:
-            for p in csvs:
-                try:
-                    df = pd.read_csv(p)
-                except Exception as e:
-                    print(f"CSV read failed {p}: {e}")
-                    continue
-                sheet = uniq(clean_sheet(os.path.splitext(os.path.basename(p))[0] or "CSV"))
-                df.to_excel(w, index=False, sheet_name=sheet)
+          for p in csvs:
+            try:
+              df = pd.read_csv(p)
+            except Exception as e:
+              print(f"CSV read failed {p}: {e}")
+              continue
+            sheet = uniq(clean_sheet(os.path.splitext(os.path.basename(p))[0] or "CSV"))
+            df.to_excel(w, index=False, sheet_name=sheet)
 
-            for p in jsons:
-                try:
-                    with open(p, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    try:
-                        df = pd.json_normalize(data)
-                    except Exception:
-                        df = pd.DataFrame({"raw_json":[json.dumps(data, ensure_ascii=False)]})
-                except Exception as e:
-                    print(f"JSON read failed {p}: {e}")
-                    continue
-                sheet = uniq(clean_sheet(os.path.splitext(os.path.basename(p))[0] or "JSON"))
-                df.to_excel(w, index=False, sheet_name=sheet)
+          for p in jsons:
+            try:
+              with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+              try:
+                df = pd.json_normalize(data)
+              except Exception:
+                df = pd.DataFrame({"raw_json":[json.dumps(data, ensure_ascii=False)]})
+            except Exception as e:
+              print(f"JSON read failed {p}: {e}")
+              continue
+            sheet = uniq(clean_sheet(os.path.splitext(os.path.basename(p))[0] or "JSON"))
+            df.to_excel(w, index=False, sheet_name=sheet)
 
         print(f"Wrote {out} with {len(csvs)} CSV sheet(s) and {len(jsons)} JSON sheet(s).")
         PY
@@ -152,5 +152,5 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         tag_name: excel-${{ env.DATE_STR }}
-        name: "Daily Excel — ${{ env.DATE_STR }}"
+        name: "Daily Excel - ${{ env.DATE_STR }}"
         files: data-${{ env.DATE_STR }}.xlsx
