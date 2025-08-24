@@ -1,0 +1,43 @@
+📋 SETUP INSTRUCTIONS FOR RINGCENTRAL RECORDING FETCHER
+========================================================
+
+1. RENAME THE ENV FILE:
+   Rename "env.txt" to ".env" in this directory
+
+   In Windows Explorer:
+   - Right-click on env.txt
+   - Select "Rename"
+   - Change to ".env" (Windows may warn about changing extension, click Yes)
+
+   OR in PowerShell:
+   Rename-Item env.txt .env
+
+2. YOUR CREDENTIALS ARE READY:
+   ✅ RingCentral Username: (602) 654-1693
+   ✅ RingCentral Password: Tingringcentral_101
+   ✅ Groq API Key: Already configured
+
+3. HOW TO USE:
+
+   A) Fetch recordings for August 13, 2025:
+      python ringcentral_recordings.py
+
+   B) Fetch recordings for any other date:
+      python fetch_recordings_for_date.py 2024-01-15
+
+   C) Fetch with custom duration filter (e.g., 30 seconds):
+      python fetch_recordings_for_date.py 2024-01-15 30
+
+4. IMPORTANT NOTES:
+   - August 13, 2025 is a future date (no recordings exist yet)
+   - RingCentral retains recordings for ~90 days
+   - Use dates within the last 90 days for best results
+
+5. OUTPUT:
+   - Downloaded recordings: ./recordings/ folder
+   - Transcriptions: [filename]_transcription.txt
+   - Summary: recordings_summary_YYYY-MM-DD.json
+
+NO NEED TO SET ENVIRONMENT VARIABLES MANUALLY!
+The scripts will automatically read from the .env file.
+

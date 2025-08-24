@@ -515,18 +515,44 @@ class DevTierOptimizedProcessor:
         self.save_results(results, output_dir, target_date)
     
     def save_results(self, results: List[Dict], output_dir: Path, target_date: str):
-        """Save results to JSON and CSV files"""
+        """Save results to JSON and CSV files with statistics"""
         # Sort by date
         results.sort(key=lambda x: x.get('date', ''))
         
-        # Save JSON
-        json_file = output_dir / f"transcriptions_{target_date}.json"
-        with open(json_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
+        # Prepare statistics summary
+        stats_summary = {
+            'processing_date': target_date,
+            'total_recordings_found': self.stats['recordings_found'],
+            'total_recordings_processed': self.stats['recordings_processed'],
+            'total_recordings_skipped': self.stats['recordings_skipped'],
+            'success_rate': f"{(self.stats['recordings_processed'] / max(self.stats['recordings_found'], 1) * 100):.1f}%",
+            'total_audio_minutes': round(self.stats['total_audio_seconds'] / 60, 1),
+            'download_errors': self.stats['download_errors'],
+            'transcription_errors': self.stats['transcription_errors']
+        }
         
-        # Save CSV
+        # Save enhanced JSON with statistics
+        json_file = output_dir / f"transcriptions_{target_date}.json"
+        json_data = {
+            'statistics': stats_summary,
+            'transcriptions': results
+        }
+        with open(json_file, 'w', encoding='utf-8') as f:
+            json.dump(json_data, f, indent=2, ensure_ascii=False)
+        
+        # Save CSV with statistics header
         csv_file = output_dir / f"transcriptions_{target_date}.csv"
         with open(csv_file, 'w', encoding='utf-8') as f:
+            # Write statistics as comments
+            f.write(f"# Processing Statistics for {target_date}\n")
+            f.write(f"# Total Recordings Found: {stats_summary['total_recordings_found']}\n")
+            f.write(f"# Total Recordings Processed: {stats_summary['total_recordings_processed']}\n")
+            f.write(f"# Total Recordings Skipped (too short): {stats_summary['total_recordings_skipped']}\n")
+            f.write(f"# Success Rate: {stats_summary['success_rate']}\n")
+            f.write(f"# Total Audio Time: {stats_summary['total_audio_minutes']} minutes\n")
+            f.write(f"#\n")
+            
+            # Write data headers and rows
             f.write("Recording ID,Date,Duration (seconds),From,To,Direction,Transcription\n")
             for result in results:
                 transcription_escaped = result["transcription"].replace('"', '""')

@@ -1,0 +1,34 @@
+app = "transcription-processor"
+primary_region = "ord"
+
+[build]
+
+[env]
+  PYTHONUNBUFFERED = "1"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+# For cron jobs, we'll use a separate process
+[processes]
+  app = "python reliable_processor.py"
+
+# Free tier resource limits
+[deploy]
+  strategy = "immediate"
+
+[resources]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+

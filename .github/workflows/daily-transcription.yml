@@ -1,0 +1,163 @@
+name: Daily Call Transcription
+
+on:
+  schedule:
+    # Run every day at 2 AM UTC (adjust timezone as needed)
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  # First processing job - handles first batch
+  transcribe-batch-1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330  # 5.5 hour timeout
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Run transcription batch 1
+      env:
+        RC_CLIENT_ID: ${{ secrets.RC_CLIENT_ID }}
+        RC_CLIENT_SECRET: ${{ secrets.RC_CLIENT_SECRET }}
+        RC_JWT: ${{ secrets.RC_JWT }}
+        GROQ_API_KEY_1: ${{ secrets.GROQ_API_KEY_1 }}
+        GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+        GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+        GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+        GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+        GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+        CHUNK_SIZE: 20  # Smaller chunks for safety
+        RC_RPS: 0.3     # Very conservative RingCentral rate limit
+      run: |
+        python chunked_processor.py
+        
+    - name: Upload batch 1 results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: batch-1-results
+        path: daily_recordings/
+        retention-days: 7
+
+  # Second processing job - continues where batch 1 left off
+  transcribe-batch-2:
+    runs-on: ubuntu-latest
+    needs: transcribe-batch-1
+    if: always()  # Run even if batch 1 failed/timed out
+    timeout-minutes: 330
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Download batch 1 results
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        name: batch-1-results
+        path: daily_recordings/
+        
+    - name: Continue transcription batch 2
+      env:
+        RC_CLIENT_ID: ${{ secrets.RC_CLIENT_ID }}
+        RC_CLIENT_SECRET: ${{ secrets.RC_CLIENT_SECRET }}
+        RC_JWT: ${{ secrets.RC_JWT }}
+        GROQ_API_KEY_1: ${{ secrets.GROQ_API_KEY_1 }}
+        GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+        GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+        GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+        GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+        GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+        CHUNK_SIZE: 20
+        RC_RPS: 0.3
+      run: |
+        python chunked_processor.py
+        
+    - name: Upload batch 2 results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: batch-2-results
+        path: daily_recordings/
+        retention-days: 7
+
+  # Third processing job - final cleanup
+  transcribe-batch-3:
+    runs-on: ubuntu-latest
+    needs: [transcribe-batch-1, transcribe-batch-2]
+    if: always()
+    timeout-minutes: 330
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Download previous results
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+      with:
+        pattern: batch-*-results
+        path: daily_recordings/
+        merge-multiple: true
+        
+    - name: Final transcription batch 3
+      env:
+        RC_CLIENT_ID: ${{ secrets.RC_CLIENT_ID }}
+        RC_CLIENT_SECRET: ${{ secrets.RC_CLIENT_SECRET }}
+        RC_JWT: ${{ secrets.RC_JWT }}
+        GROQ_API_KEY_1: ${{ secrets.GROQ_API_KEY_1 }}
+        GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+        GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+        GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+        GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+        GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+        CHUNK_SIZE: 20
+        RC_RPS: 0.3
+      run: |
+        python chunked_processor.py
+        
+    - name: Upload final results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: final-transcription-results-${{ github.run_number }}
+        path: daily_recordings/
+        retention-days: 30
+        
+    - name: Processing Summary
+      if: always()
+      run: |
+        echo "=== TRANSCRIPTION PROCESSING COMPLETE ===" 
+        echo "Check the 'final-transcription-results-${{ github.run_number }}' artifact for all results"
+        if [ -f daily_recordings/*/summary.json ]; then
+          echo "=== SUMMARY ==="
+          cat daily_recordings/*/summary.json
+        fi

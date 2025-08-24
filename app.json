@@ -1,0 +1,50 @@
+{
+  "name": "RingCentral Call Processor",
+  "description": "Automatically download and transcribe RingCentral call recordings daily",
+  "keywords": [
+    "ringcentral",
+    "transcription",
+    "automation"
+  ],
+  "env": {
+    "RC_CLIENT_ID": {
+      "description": "Your RingCentral Client ID",
+      "required": true
+    },
+    "RC_CLIENT_SECRET": {
+      "description": "Your RingCentral Client Secret",
+      "required": true
+    },
+    "RC_JWT": {
+      "description": "Your RingCentral JWT Token",
+      "required": true
+    },
+    "GROQ_API_KEY_1": {
+      "description": "First Groq API Key",
+      "required": true
+    },
+    "GROQ_API_KEY_2": {
+      "description": "Second Groq API Key",
+      "required": false
+    },
+    "GROQ_API_KEY_3": {
+      "description": "Third Groq API Key",
+      "required": false
+    },
+    "HUBSPOT_ACCESS_TOKEN": {
+      "description": "HubSpot Access Token (optional)",
+      "required": false
+    }
+  },
+  "formation": {
+    "worker": {
+      "quantity": 1,
+      "size": "standard-1x"
+    }
+  },
+  "addons": [
+    {
+      "plan": "scheduler:standard"
+    }
+  ]
+}

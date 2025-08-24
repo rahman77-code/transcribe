@@ -1,0 +1,98 @@
+name: Safe Daily Call Processor (10-12 hours)
+
+on:
+  schedule:
+    # Runs at 6 PM Central Time (12 AM UTC) - gives full night to process
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  process-calls-safely:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1440  # 24 hours max (GitHub limit)
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run SAFE daily processor (10-12 hours)
+        env:
+          RC_CLIENT_ID: ${{ secrets.RC_CLIENT_ID }}
+          RC_CLIENT_SECRET: ${{ secrets.RC_CLIENT_SECRET }}
+          RC_JWT: ${{ secrets.RC_JWT }}
+          GROQ_API_KEY_1: ${{ secrets.GROQ_API_KEY_1 }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+        run: |
+          echo "Starting SAFE processor at $(date)"
+          echo "This will take 10-12 hours to complete..."
+          python daily_call_processor_safe.py
+          echo "Completed at $(date)"
+      
+      - name: Upload recordings and transcriptions
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: recordings-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            daily_recordings/
+            *.log
+          retention-days: 30
+      
+      - name: Create summary comment
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const date = new Date();
+            date.setDate(date.getDate() - 1);
+            const dateStr = date.toISOString().split('T')[0];
+            
+            let summary = '## 📊 Daily Processing Complete!\n\n';
+            
+            try {
+              const summaryFile = `daily_recordings/${dateStr}/summary_${dateStr.replace(/-/g, '')}.json`;
+              if (fs.existsSync(summaryFile)) {
+                const data = JSON.parse(fs.readFileSync(summaryFile, 'utf8'));
+                summary += `- **Date**: ${data.date}\n`;
+                summary += `- **Duration**: ${data.total_duration}\n`;
+                summary += `- **Total Calls**: ${data.total_calls}\n`;
+                summary += `- **Recordings Processed**: ${data.successfully_processed}/${data.calls_with_recordings}\n`;
+                summary += `- **Status**: ✅ Success\n`;
+              }
+            } catch (e) {
+              summary += '⚠️ Could not read summary file\n';
+            }
+            
+            summary += `\n[Download Results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            // Comment on the workflow run
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'daily-processor-safe.yml',
+              ref: 'main',
+              inputs: {
+                summary: summary
+              }
+            }).catch(() => {});
+            
+            console.log(summary);

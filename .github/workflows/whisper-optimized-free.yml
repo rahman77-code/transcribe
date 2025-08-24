@@ -1,0 +1,185 @@
+name: Whisper Optimized - Free Tier (20 RPM)
+
+on:
+  schedule:
+    # Runs at 5 PM Central Time (11 PM UTC)
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: 'Date to process (YYYY-MM-DD)'
+        required: false
+        type: string
+
+jobs:
+  process-with-whisper-free:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max (GitHub limit)
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run Whisper Optimized Processor (Free Tier)
+        env:
+          # Whisper configuration
+          WHISPER_API_TIER: free  # 20 requests per minute
+          # Target date from workflow input
+          TARGET_DATE: ${{ github.event.inputs.target_date }}
+          # RingCentral
+          RC_CLIENT_ID: ${{ secrets.RC_CLIENT_ID }}
+          RC_CLIENT_SECRET: ${{ secrets.RC_CLIENT_SECRET }}
+          RC_JWT: ${{ secrets.RC_JWT }}
+          RC_SERVER_URL: https://platform.ringcentral.com
+          # All available Groq API Keys (up to 50)
+          GROQ_API_KEY_1: ${{ secrets.GROQ_API_KEY_1 }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+          GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+          GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+          GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+          GROQ_API_KEY_7: ${{ secrets.GROQ_API_KEY_7 }}
+          GROQ_API_KEY_8: ${{ secrets.GROQ_API_KEY_8 }}
+          GROQ_API_KEY_9: ${{ secrets.GROQ_API_KEY_9 }}
+          GROQ_API_KEY_10: ${{ secrets.GROQ_API_KEY_10 }}
+          GROQ_API_KEY_11: ${{ secrets.GROQ_API_KEY_11 }}
+          GROQ_API_KEY_12: ${{ secrets.GROQ_API_KEY_12 }}
+          GROQ_API_KEY_13: ${{ secrets.GROQ_API_KEY_13 }}
+          GROQ_API_KEY_14: ${{ secrets.GROQ_API_KEY_14 }}
+          GROQ_API_KEY_15: ${{ secrets.GROQ_API_KEY_15 }}
+          GROQ_API_KEY_16: ${{ secrets.GROQ_API_KEY_16 }}
+          GROQ_API_KEY_17: ${{ secrets.GROQ_API_KEY_17 }}
+          # Add more if you have them...
+          # HubSpot
+          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+        run: |
+          echo "🚀 WHISPER OPTIMIZED PROCESSOR - FREE TIER"
+          echo "🆓 Using Whisper FREE tier (20 RPM)"
+          echo "⚡ Processing rate: ~1,000 calls in 6 hours"
+          echo "🔑 Using available Groq API keys"
+          echo "🔄 Auto-token refresh enabled"
+          echo "📅 Started at: $(date)"
+          if [ -n "$TARGET_DATE" ]; then
+            echo "📅 Processing date: $TARGET_DATE"
+          else
+            echo "📅 Processing: Yesterday's recordings"
+          fi
+          echo "================================"
+          
+          python daily_call_processor_whisper_optimized.py
+          
+          echo "================================"
+          echo "✅ Completed at: $(date)"
+      
+      - name: Generate Processing Report
+        if: always()
+        run: |
+          echo "# 📊 Whisper Optimized Processing Report (Free Tier)" > report.md
+          echo "" >> report.md
+          echo "## Processing Details" >> report.md
+          echo "- **Started**: $(date)" >> report.md
+          echo "- **Workflow Run**: #${{ github.run_number }}" >> report.md
+          echo "- **Whisper Tier**: FREE (20 RPM)" >> report.md
+          if [ -n "${{ github.event.inputs.target_date }}" ]; then
+            echo "- **Date Processed**: ${{ github.event.inputs.target_date }}" >> report.md
+          else
+            echo "- **Date Processed**: Yesterday" >> report.md
+          fi
+          echo "" >> report.md
+          
+          # Check for summary file
+          if [ -n "${{ github.event.inputs.target_date }}" ]; then
+            PROCESS_DATE="${{ github.event.inputs.target_date }}"
+          else
+            PROCESS_DATE=$(date -d "yesterday" +%Y-%m-%d)
+          fi
+          SUMMARY="daily_recordings/$PROCESS_DATE/summary.json"
+          
+          if [ -f "$SUMMARY" ]; then
+            echo "## Results Summary" >> report.md
+            echo "" >> report.md
+            
+            # Extract key metrics with defaults
+            TOTAL=$(jq -r '.total_calls // 0' $SUMMARY)
+            FOUND=$(jq -r '.recordings_found // 0' $SUMMARY)
+            PROCESSED=$(jq -r '.recordings_processed // 0' $SUMMARY)
+            DURATION=$(jq -r '.duration_hours // 0' $SUMMARY 2>/dev/null || echo "0")
+            RATE=$(jq -r '.success_rate // "0%"' $SUMMARY)
+            AUDIO_HOURS=$(jq -r '.total_audio_hours // 0' $SUMMARY 2>/dev/null || echo "0")
+            PROCESSING_RATE=$(jq -r '.processing_rate // "0"' $SUMMARY)
+            
+            echo "| Metric | Value |" >> report.md
+            echo "|--------|-------|" >> report.md
+            echo "| **Total Calls** | $TOTAL |" >> report.md
+            echo "| **Recordings Found** | $FOUND |" >> report.md
+            echo "| **Successfully Processed** | $PROCESSED |" >> report.md
+            echo "| **Success Rate** | $RATE |" >> report.md
+            echo "| **Processing Duration** | ${DURATION:-0} hours |" >> report.md
+            echo "| **Processing Rate** | $PROCESSING_RATE |" >> report.md
+            echo "| **Audio Transcribed** | ${AUDIO_HOURS:-0} hours |" >> report.md
+            echo "| **Whisper Tier** | FREE (20 RPM) |" >> report.md
+            
+            echo "" >> report.md
+            echo "### 🎯 Performance Analysis" >> report.md
+            if [ "$PROCESSED" -eq "$FOUND" ]; then
+              echo "✅ **PERFECT RUN!** All recordings processed successfully!" >> report.md
+            elif [ $(echo "$RATE" | cut -d'%' -f1 | cut -d'.' -f1) -gt 95 ]; then
+              echo "✅ **Excellent!** Over 95% success rate achieved." >> report.md
+            else
+              echo "⚠️ Some recordings failed. Check logs for details." >> report.md
+            fi
+            
+            echo "" >> report.md
+            echo "### 📈 Whisper Rate Limit Status" >> report.md
+            echo "With the FREE tier (20 RPM), this workflow can process:" >> report.md
+            echo "- **20 calls/minute** = 1,200 calls/hour" >> report.md
+            echo "- **Up to 7,200 calls** in 6 hours (theoretical max)" >> report.md
+            echo "- **Actual rate**: Limited by download time + 3s transcription delay" >> report.md
+          else
+            echo "⚠️ Summary file not found" >> report.md
+          fi
+          
+          echo "" >> report.md
+          echo "## 📥 Download Results" >> report.md
+          echo "[Download all recordings and transcriptions](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> report.md
+          
+          cat report.md
+      
+      - name: Upload recordings and transcriptions
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: whisper-recordings-${{ github.run_number }}
+          path: |
+            daily_recordings/
+            *.log
+            report.md
+          retention-days: 30
+          compression-level: 9
+      
+      - name: Show API usage statistics
+        if: always()
+        run: |
+          echo "🔑 API Key Performance:"
+          if [ -f "daily_call_processor_whisper_optimized.log" ]; then
+            grep "API Key Usage:" -A 20 daily_call_processor_whisper_optimized.log | tail -21 || true
+          fi
+
+
+

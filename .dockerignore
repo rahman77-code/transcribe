@@ -1,0 +1,8 @@
+.env
+*.env
+daily_recordings/
+*.mp3
+*.log
+__pycache__/
+.git/
+.github/

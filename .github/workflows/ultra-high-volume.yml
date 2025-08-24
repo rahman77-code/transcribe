@@ -1,0 +1,182 @@
+name: Ultra High Volume Processor (300 RPM Optimized)
+
+on:
+  schedule:
+    # Runs at 5 PM Central Time (11 PM UTC)
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: 'Date to process (YYYY-MM-DD)'
+        required: false
+        type: string
+
+jobs:
+  process-1000-plus-calls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max (GitHub limit)
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}-v2
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          echo "Installing groq package explicitly..."
+          pip install groq
+          echo "Installing httpx (groq dependency)..."
+          pip install httpx
+          echo "Installing other requirements..."
+          pip install -r requirements.txt
+          echo "Verifying groq installation..."
+          pip show groq || echo "ERROR: groq not installed!"
+          pip list | grep groq || echo "groq not in pip list"
+      
+      - name: Run Ultra High Volume Processor
+        env:
+          # Target date from workflow input
+          TARGET_DATE: ${{ github.event.inputs.target_date }}
+          # RingCentral
+          RC_CLIENT_ID: ${{ secrets.RC_CLIENT_ID }}
+          RC_CLIENT_SECRET: ${{ secrets.RC_CLIENT_SECRET }}
+          RC_JWT: ${{ secrets.RC_JWT }}
+          RC_SERVER_URL: https://platform.ringcentral.com
+          # 6 Dev Tier Groq API Keys (300 RPM each = 1800 RPM total)
+          GROQ_API_KEY_1: ${{ secrets.GROQ_API_KEY_1 }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+          GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+          GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+          GROQ_API_KEY_6: ${{ secrets.GROQ_API_KEY_6 }}
+          # Mark these as dev tier keys
+          DEV_TIER_KEYS: "1,2,3,4,5,6"
+          # HubSpot
+          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+          # RingCentral throttling to avoid 429 errors
+          RC_RPS: "0.5"  # Only 0.5 requests per second = 1 request every 2 seconds
+          RC_DOWNLOAD_WORKERS: "1"
+        run: |
+          echo "🚀 ULTRA HIGH VOLUME PROCESSOR - DEV TIER OPTIMIZED"
+          echo "⚡ Processing with 300 RPM per API key × 6 keys = 1,800 RPM total"
+          echo "🔑 Using 6 confirmed dev tier Groq API keys"
+          echo "🔄 Auto-token refresh enabled"
+          echo "📈 Can process 1000+ recordings in under 4 hours!"
+          echo "📅 Started at: $(date)"
+          if [ -n "$TARGET_DATE" ]; then
+            echo "📅 Processing date: $TARGET_DATE"
+          else
+            echo "📅 Processing: Yesterday's recordings"
+          fi
+          echo "================================"
+          
+          python daily_call_processor_dev_optimized.py
+          
+          echo "================================"
+          echo "✅ Completed at: $(date)"
+      
+      - name: Generate Processing Report
+        if: always()
+        run: |
+          echo "# 📊 Ultra High Volume Processing Report" > report.md
+          echo "" >> report.md
+          echo "## Processing Details" >> report.md
+          echo "- **Started**: $(date)" >> report.md
+          echo "- **Workflow Run**: #${{ github.run_number }}" >> report.md
+          if [ -n "${{ github.event.inputs.target_date }}" ]; then
+            echo "- **Date Processed**: ${{ github.event.inputs.target_date }}" >> report.md
+          else
+            echo "- **Date Processed**: Yesterday" >> report.md
+          fi
+          echo "" >> report.md
+          
+          # Check for summary file
+          if [ -n "${{ github.event.inputs.target_date }}" ]; then
+            PROCESS_DATE="${{ github.event.inputs.target_date }}"
+          else
+            PROCESS_DATE=$(date -d "yesterday" +%Y-%m-%d)
+          fi
+          SUMMARY="daily_recordings/$PROCESS_DATE/summary.json"
+          
+          if [ -f "$SUMMARY" ]; then
+            echo "## Results Summary" >> report.md
+            echo "" >> report.md
+            
+            # Extract key metrics with defaults
+            TOTAL=$(jq -r '.total_calls // 0' $SUMMARY)
+            FOUND=$(jq -r '.recordings_found // 0' $SUMMARY)
+            PROCESSED=$(jq -r '.recordings_processed // 0' $SUMMARY)
+            DURATION=$(jq -r '.duration_hours // 0' $SUMMARY 2>/dev/null || echo "0")
+            RATE=$(jq -r '.success_rate // "0%"' $SUMMARY)
+            AUDIO_HOURS=$(jq -r '.total_audio_hours // 0' $SUMMARY 2>/dev/null || echo "0")
+            
+            echo "| Metric | Value |" >> report.md
+            echo "|--------|-------|" >> report.md
+            echo "| **Total Calls** | $TOTAL |" >> report.md
+            echo "| **Recordings Found** | $FOUND |" >> report.md
+            echo "| **Successfully Processed** | $PROCESSED |" >> report.md
+            echo "| **Success Rate** | $RATE |" >> report.md
+            echo "| **Processing Duration** | ${DURATION:-0} hours |" >> report.md
+            echo "| **Audio Transcribed** | ${AUDIO_HOURS:-0} hours |" >> report.md
+            KEYS_USED=$(jq -r '.api_keys_used // 0' $SUMMARY 2>/dev/null || echo "0")
+            RPM_CAPACITY=$(jq -r '.total_rpm_capacity // 0' $SUMMARY 2>/dev/null || echo "0")
+            echo "| **API Keys Used** | $KEYS_USED |" >> report.md
+            echo "| **Total RPM Capacity** | $RPM_CAPACITY |" >> report.md
+            
+            # Performance metrics
+            if [ "$PROCESSED" -gt 0 ] 2>/dev/null; then
+              if command -v bc >/dev/null 2>&1; then
+                AVG_TIME=$(echo "scale=1; ${DURATION:-0} * 3600 / $PROCESSED" | bc)
+                echo "| **Avg Time/Recording** | $AVG_TIME seconds |" >> report.md
+              fi
+            fi
+            
+            echo "" >> report.md
+            echo "### 🎯 Performance Analysis" >> report.md
+            if [ "$PROCESSED" -eq "$FOUND" ]; then
+              echo "✅ **PERFECT RUN!** All recordings processed successfully!" >> report.md
+            elif [ $(echo "$RATE" | cut -d'%' -f1 | cut -d'.' -f1) -gt 95 ]; then
+              echo "✅ **Excellent!** Over 95% success rate achieved." >> report.md
+            else
+              echo "⚠️ Some recordings failed. Check logs for details." >> report.md
+            fi
+          else
+            echo "⚠️ Summary file not found" >> report.md
+          fi
+          
+          echo "" >> report.md
+          echo "## 📥 Download Results" >> report.md
+          echo "[Download all recordings and transcriptions](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> report.md
+          
+          cat report.md
+      
+      - name: Upload recordings and transcriptions
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ultra-recordings-${{ github.run_number }}
+          path: |
+            daily_recordings/
+            *.log
+            report.md
+          retention-days: 30
+          compression-level: 9
+      
+      - name: Show key statistics
+        if: always()
+        run: |
+          echo "🔑 API Key Performance:"
+          if [ -f "daily_call_processor_dev_optimized.log" ]; then
+            grep "API Key Performance:" -A 20 daily_call_processor_dev_optimized.log | tail -21 || true
+          fi
