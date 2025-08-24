@@ -120,30 +120,87 @@ jobs:
           return s
 
         with pd.ExcelWriter(out, engine="openpyxl") as w:
-          for p in csvs:
-            try:
-              df = pd.read_csv(p)
-            except Exception as e:
-              print(f"CSV read failed {p}: {e}")
-              continue
-            sheet = uniq(clean_sheet(os.path.splitext(os.path.basename(p))[0] or "CSV"))
-            df.to_excel(w, index=False, sheet_name=sheet)
-
+          all_stats = []
+          
+          # First pass: Look for statistics in JSON files
           for p in jsons:
             try:
               with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f)
-              try:
-                df = pd.json_normalize(data)
-              except Exception:
-                df = pd.DataFrame({"raw_json":[json.dumps(data, ensure_ascii=False)]})
+              
+              # Check if this JSON has statistics
+              if isinstance(data, dict) and 'statistics' in data:
+                stats = data['statistics']
+                all_stats.append({
+                  "File": os.path.basename(p),
+                  "Processing Date": stats.get('processing_date', ''),
+                  "Total Found": stats.get('total_recordings_found', 0),
+                  "Total Processed": stats.get('total_recordings_processed', 0),
+                  "Total Skipped": stats.get('total_recordings_skipped', 0),
+                  "Success Rate": stats.get('success_rate', ''),
+                  "Audio Minutes": stats.get('total_audio_minutes', 0),
+                  "Download Errors": stats.get('download_errors', 0),
+                  "Transcription Errors": stats.get('transcription_errors', 0)
+                })
+                
+                # If it has transcriptions, create a dedicated sheet
+                if 'transcriptions' in data and data['transcriptions']:
+                  trans_df = pd.DataFrame(data['transcriptions'])
+                  if 'duration' in trans_df.columns:
+                    trans_df['duration_minutes'] = round(trans_df['duration'] / 60, 1)
+                  sheet = uniq(clean_sheet("Transcriptions"))
+                  trans_df.to_excel(w, index=False, sheet_name=sheet)
+              else:
+                # Regular JSON processing
+                try:
+                  df = pd.json_normalize(data)
+                except Exception:
+                  df = pd.DataFrame({"raw_json":[json.dumps(data, ensure_ascii=False)]})
+                sheet = uniq(clean_sheet(os.path.splitext(os.path.basename(p))[0] or "JSON"))
+                df.to_excel(w, index=False, sheet_name=sheet)
             except Exception as e:
               print(f"JSON read failed {p}: {e}")
               continue
-            sheet = uniq(clean_sheet(os.path.splitext(os.path.basename(p))[0] or "JSON"))
-            df.to_excel(w, index=False, sheet_name=sheet)
+          
+          # Create SUMMARY sheet first if we found statistics
+          if all_stats:
+            summary_df = pd.DataFrame(all_stats)
+            summary_df.to_excel(w, index=False, sheet_name="SUMMARY")
+            print(f"Added SUMMARY sheet with statistics from {len(all_stats)} files")
+          
+          # Process CSV files (check for stats in comments)
+          for p in csvs:
+            try:
+              # Check for statistics in comment headers
+              stats_dict = {"File": os.path.basename(p)}
+              with open(p, 'r', encoding='utf-8') as f:
+                for i, line in enumerate(f):
+                  if i > 10:
+                    break
+                  if line.startswith('#'):
+                    if 'Total Recordings Found:' in line:
+                      stats_dict['Total Found'] = line.split(':')[-1].strip()
+                    elif 'Total Recordings Processed:' in line:
+                      stats_dict['Total Processed'] = line.split(':')[-1].strip()
+                    elif 'Total Recordings Skipped' in line:
+                      stats_dict['Total Skipped'] = line.split(':')[-1].strip()
+                    elif 'Success Rate:' in line:
+                      stats_dict['Success Rate'] = line.split(':')[-1].strip()
+              
+              if len(stats_dict) > 1 and not all_stats:  # Add CSV stats if no JSON stats
+                all_stats.append(stats_dict)
+              
+              # Read the actual CSV
+              df = pd.read_csv(p, comment='#')
+              sheet = uniq(clean_sheet(os.path.splitext(os.path.basename(p))[0] or "CSV"))
+              df.to_excel(w, index=False, sheet_name=sheet)
+            except Exception as e:
+              print(f"CSV read failed {p}: {e}")
+              continue
 
         print(f"Wrote {out} with {len(csvs)} CSV sheet(s) and {len(jsons)} JSON sheet(s).")
+        if all_stats:
+          print("✅ Added SUMMARY sheet with recording statistics!")
         PY
 
     # ========== NEW: Publish the Excel on a GitHub Release ==========
